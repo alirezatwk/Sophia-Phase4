@@ -48,6 +48,7 @@ public class CodeGenerator extends Visitor<String> {
     private FileWriter currentFile;
     private ClassDeclaration currentClass;
     private MethodDeclaration currentMethod;
+    static String methodHeader = ".limit stack 128\n" + ".limit locals 128";
 
     public CodeGenerator(Graph<String> classHierarchy) {
         this.classHierarchy = classHierarchy;
@@ -122,9 +123,9 @@ public class CodeGenerator extends Visitor<String> {
     }
 
     private void addStaticMainMethod() {
-        //todo
-        String command = ".method public static main([Ljava/lang/String;)V\n";
-        
+
+        addCommand(".method public static main([Ljava/lang/String;)V\n" + methodHeader);
+
     }
 
     private int slotOf(String identifier) {
@@ -189,15 +190,13 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(ClassDeclaration classDeclaration) {
         createFile(classDeclaration.getClassName().getName());
-        String command = "";
-        command += ".class ";
-        command += classDeclaration.getClassName().getName();
-        command += "\n";
+        addCommand(".class " + classDeclaration.getClassName().getName());
 
         if(classDeclaration.getParentClassName() == null)
-            command += ".super java/lang/Object\n";
+            addCommand(".super java/lang/Object");
         else
-            command += ".super " + classDeclaration.getParentClassName().getName() + "\n"; // Not sure.
+            addCommand(".super " + classDeclaration.getParentClassName().getName()); // Not sure.
+        addCommand("");
 
         for(FieldDeclaration fieldDec : classDeclaration.getFields())
             fieldDec.accept(this);
@@ -222,14 +221,14 @@ public class CodeGenerator extends Visitor<String> {
             this.expressionTypeChecker.setCurrentMethod(methodDec);
             methodDec.accept(this);
         }
-        addCommand(command);
+        if(classDeclaration.getClassName().getName().equals("Main"))
+            addStaticMainMethod();
         return null;
     }
 
     @Override
     public String visit(ConstructorDeclaration constructorDeclaration) {
-        if(currentClass.getClassName().getName().equals("Main"))
-            addStaticMainMethod();
+
 
         //todo add default constructor or static main method if needed
         this.visit((MethodDeclaration) constructorDeclaration);
