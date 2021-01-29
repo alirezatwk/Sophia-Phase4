@@ -241,11 +241,19 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(MethodDeclaration methodDeclaration) {
         //todo add method or constructor headers
+        addCommand(".method " + /*methodDeclaration.getMethodName().getName()*/ "<init>" + '(' + ')' + 'V' + '\n' + methodHeader); // TODO: Add arguments and return type
+        addCommand("aload_0");
+        addCommand("invokespecial java/lang/Object/<init>()V");
+
         if(methodDeclaration instanceof ConstructorDeclaration) {
             //todo call parent constructor
             //todo initialize fields
         }
+        for(Statement statement : methodDeclaration.getBody())
+            statement.accept(this);
         //todo visit local vars and body and add return if needed
+        addCommand("return"); // TODO: Check return type
+        addCommand(".end method");
         return null;
     }
 
@@ -287,7 +295,9 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(PrintStmt print) {
-        //todo
+        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream;"); // TODO: Just for checking.
+        addCommand("iconst_2");
+        addCommand("invokevirtual java/io/PrintStream/println(I)V");
         return null;
     }
 
