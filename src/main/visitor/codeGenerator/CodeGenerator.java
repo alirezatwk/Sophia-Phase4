@@ -123,9 +123,12 @@ public class CodeGenerator extends Visitor<String> {
     }
 
     private void addStaticMainMethod() {
-
         addCommand(".method public static main([Ljava/lang/String;)V\n" + methodHeader);
-
+        addCommand("new Main");
+        addCommand("invokespecial Main/<init>()V");
+        addCommand("return");
+        addCommand(".end method");
+        addCommand("");
     }
 
     private int slotOf(String identifier) {
