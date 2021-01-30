@@ -4,8 +4,9 @@ class Test{
 
 
     public static void main(String args[]){
-        B b = new B();
-        b.sibil();
+        B a = new B();
+        Object b = a;
+        B c = (B) b;
     }
 
     void sum(int aa, Integer a, Boolean b, Test c, int d){

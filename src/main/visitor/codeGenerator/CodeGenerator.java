@@ -555,10 +555,48 @@ public class CodeGenerator extends Visitor<String> {
     public String visit(MethodCall methodCall) {
         String commands = "";
         commands += methodCall.getInstance().accept(this);
+        commands += "new java/util/ArrayList\n";
+        commands += "dup\n";
+        commands += "invokespecial java/util/ArrayList/<init>()V\n";
         for (Expression arg : methodCall.getArgs()) {
-            commands += arg.accept(this);
+            Type argType = arg.accept(expressionTypeChecker);
+            if (argType instanceof IntType) {
+                commands += "new java/lang/Integer\n";
+                commands += "dup\n";
+                commands += arg.accept(this);
+                commands += "invokespecial java/lang/Integer/<init>(I)V\n";
+            }
+            else if (argType instanceof BoolType) {
+                commands += "new java/lang/Boolean\n";
+                commands += "dup\n";
+                commands += arg.accept(this);
+                commands += "invokespecial java/lang/Boolean/<init>(Z)V\n";
+            }
+            else {
+                commands += arg.accept(this);
+            }
+            commands += "invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z\n";
+            commands += "pop\n";
         }
-        commands += "invokevirtual " + methodCall;
+        commands += "invokevirtual Fptr/invoke(Ljava/util/ArrayList;)Ljava/lang/Object;\n";
+        Type returnType = ((FptrType) methodCall.getInstance().accept(expressionTypeChecker)).getReturnType();
+        if (returnType instanceof IntType) {
+            commands += "checkcast java/lang/Integer\n";
+            commands += "invokevirtual java/lang/Integer/intValue()I\n";
+        }
+        else if (returnType instanceof BoolType) {
+            commands += "checkcast java/lang/Boolean\n";
+            commands += "invokevirtual java/lang/Boolean/booleanValue()Z\n";
+        }
+        else if (returnType instanceof StringType) {
+            commands += "checkcast java/lang/String\n";
+        }
+        else if (returnType instanceof ClassType) {
+            commands += "checkcast " + ((ClassType) returnType).getClassName().getName() + "\n";
+        }
+        else if (returnType instanceof NullType) {
+            commands += "pop\n";
+        }
         return commands;
     }
 
