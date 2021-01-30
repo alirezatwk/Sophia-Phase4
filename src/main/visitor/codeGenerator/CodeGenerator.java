@@ -123,12 +123,70 @@ public class CodeGenerator extends Visitor<String> {
     }
 
     private String makeTypeSignature(Type t) {
-        //todo
-        return null;
+        String typeString = "";
+        if (t instanceof IntType)
+            typeString += "Ljava/lang/Integer;";
+        else if (t instanceof BoolType)
+            typeString += "Ljava/lang/Boolean;";
+        else if (t instanceof StringType)
+            typeString += "Ljava/lang/String;";
+        else if (t instanceof FptrType)
+            typeString += "LFptr;";
+        else if (t instanceof ListType)
+            typeString += "LList;";
+        else if (t instanceof ClassType)
+            typeString += "L" + ((ClassType) t).getClassName().getName() + ";";
+        return typeString;
     }
 
     private void addDefaultConstructor() {
-        //todo
+        addCommand(".method public <init>()V" + methodHeader);
+        addCommand("aload_0");
+        if (this.currentClass.getParentClassName() == null)
+            addCommand("invokespecial java/lang/Object/<init>()V");
+        else
+            addCommand("invokespecial " + currentClass.getParentClassName().getName() + "/<init>()V"); // TODO: Maybe has arguments
+
+        for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
+            addCommand("aload_0");
+            Type fieldType = fieldDeclaration.getVarDeclaration().getType();
+            if (fieldType instanceof IntType) {
+                addCommand("new java/lang/Integer");
+                addCommand("dup");
+                addCommand("iconst_0");
+                addCommand("invokespecial java/lang/Integer/<init>(I)V");
+            }
+            else if (fieldType instanceof BoolType) {
+                addCommand("new java/lang/Boolean");
+                addCommand("dup");
+                addCommand("iconst_0");
+                addCommand("invokespecial java/lang/Boolean/<init>(Z)V");
+            }
+            else if (fieldType instanceof StringType) {
+                addCommand("new java/lang/String");
+                addCommand("dup");
+                addCommand("ldc \"\"");
+                addCommand("invokespecial java/lang/String/<init>(Ljava/lang/String;)V");
+            }
+            else if (fieldType instanceof ListType) {
+                ArrayList<ListNameType> listNameTypes = ((ListType)fieldType).getElementsTypes();
+                addCommand("new List");
+                addCommand("dup ");
+                for (ListNameType listNameType : listNameTypes) {
+                    // TODO: shitttt.
+                }
+            }
+            else if (fieldType instanceof FptrType) {
+                addCommand("aconst_null");
+            }
+            else if (fieldType instanceof ClassType) {
+                addCommand("aconst_null");
+            }
+            addCommand("putfield " + currentClass.getClassName().getName() + "/" + fieldDeclaration.getVarDeclaration().getVarName().getName() + " " + makeTypeSignature(fieldDeclaration.getVarDeclaration().getType()));
+        }
+
+        addCommand("return");
+        addCommand(".end method");
     }
 
     private void addStaticMainMethod() {
@@ -145,10 +203,9 @@ public class CodeGenerator extends Visitor<String> {
             this.tempVariable += 1;
             return this.currentSlot.size() + this.tempVariable - 1;
         }
-        for (int i = 0; i < this.currentSlot.size(); i++) {
+        for (int i = 0; i < this.currentSlot.size(); i++)
             if (this.currentSlot.get(i).equals(identifier))
                 return i;
-        }
         return 0;
     }
 
@@ -168,29 +225,21 @@ public class CodeGenerator extends Visitor<String> {
     public String visit(ClassDeclaration classDeclaration) {
         createFile(classDeclaration.getClassName().getName());
         addCommand(".class " + classDeclaration.getClassName().getName());
-
         if(classDeclaration.getParentClassName() == null)
             addCommand(".super java/lang/Object");
         else
-            addCommand(".super " + classDeclaration.getParentClassName().getName()); // Not sure.
+            addCommand(".super " + classDeclaration.getParentClassName().getName());
         addCommand("");
 
         for(FieldDeclaration fieldDec : classDeclaration.getFields())
             fieldDec.accept(this);
-        if(classDeclaration.getConstructor() != null)
-        {
+        if(classDeclaration.getConstructor() != null) {
             this.currentMethod = classDeclaration.getConstructor();
             this.expressionTypeChecker.setCurrentMethod(classDeclaration.getConstructor());
             classDeclaration.getConstructor().accept(this);
         }
-        else
-        {
+        else {
             this.addDefaultConstructor();
-//            Are the next 3 lines needed?
-            this.currentMethod = classDeclaration.getConstructor();
-            this.expressionTypeChecker.setCurrentMethod(classDeclaration.getConstructor());
-            if(classDeclaration.getConstructor() != null)
-                classDeclaration.getConstructor().accept(this);
         }
         for(MethodDeclaration methodDec : classDeclaration.getMethods())
         {
@@ -205,9 +254,6 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ConstructorDeclaration constructorDeclaration) {
-
-
-        //todo add default constructor or static main method if needed
         this.visit((MethodDeclaration) constructorDeclaration);
         return null;
     }
@@ -215,11 +261,15 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(MethodDeclaration methodDeclaration) {
         //todo add method or constructor headers
+
+        currentSlot.clear();
+        currentSlot.add("this");
+
         addCommand(".method " + /*methodDeclaration.getMethodName().getName()*/ "<init>" + '(' + ')' + 'V' + '\n' + methodHeader); // TODO: Add arguments and return type
         addCommand("aload_0");
         addCommand("invokespecial java/lang/Object/<init>()V");
 
-        if(methodDeclaration instanceof ConstructorDeclaration) {
+        if (methodDeclaration instanceof ConstructorDeclaration) {
             //todo call parent constructor
             //todo initialize fields
         }
@@ -504,28 +554,79 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(MethodCall methodCall) {
         String commands = "";
-        //todo
+        commands += methodCall.getInstance().accept(this);
+        for (Expression arg : methodCall.getArgs()) {
+            commands += arg.accept(this);
+        }
+        commands += "invokevirtual " + methodCall;
         return commands;
     }
 
     @Override
     public String visit(NewClassInstance newClassInstance) {
-        String commands = "";
-        //todo
+        String commands = "new " + newClassInstance.getClass().getName() + '\n';
+        commands += "dup\n";
+        String argString = "";
+
+        for (Expression arg : newClassInstance.getArgs()) {
+            Type argType = arg.accept(expressionTypeChecker);
+            if (argType instanceof IntType) {
+                commands += "new java/lang/Integer\n";
+                commands += "dup\n";
+                commands += arg.accept(this);
+                commands += "invokespecial java/lang/Integer/<init>(I)V\n";
+            }
+            else if (argType instanceof BoolType) {
+                commands += "new java/lang/Boolean\n";
+                commands += "dup\n";
+                commands += arg.accept(this);
+                commands += "invokespecial java/lang/Boolean/<init>(Z)V\n";
+            }
+            else {
+                commands += arg.accept(this);
+            }
+            argString += makeTypeSignature(argType);
+        }
+        commands += "invokespecial " + newClassInstance.getClass().getName() + "/<init>(" + argString + ")V\n";
         return commands;
     }
 
     @Override
     public String visit(ThisClass thisClass) {
-        String commands = "";
-        //todo
+        String commands = "aload_0\n";
         return commands;
     }
 
     @Override
     public String visit(ListValue listValue) {
         String commands = "";
-        //todo
+        commands += "new List\n";
+        commands += "dup\n";
+
+        commands += "new java/util/ArrayList\n";
+        commands += "dup\n";
+
+        for (Expression expr : listValue.getElements()) {
+            Type exprType = expr.accept(expressionTypeChecker);
+            if (exprType instanceof IntType) {
+                commands += "new java/lang/Integer\n";
+                commands += "dup\n";
+                commands += expr.accept(this);
+                commands += "invokespecial java/lang/Integer/<init>(I)V\n";
+            }
+            else if (exprType instanceof BoolType) {
+                commands += "new java/lang/Boolean\n";
+                commands += "dup\n";
+                commands += expr.accept(this);
+                commands += "invokespecial java/lang/Boolean/<init>(Z)V\n";
+            }
+            else {
+                commands += expr.accept(this);
+            }
+        }
+        commands += "invokespecial java/util/ArrayList/<init>()V\n";
+
+        commands += "invokespecial List/<init>(Ljava/util/ArrayList;)V\n";
         return commands;
     }
 

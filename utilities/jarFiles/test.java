@@ -1,17 +1,22 @@
 import java.lang.Integer;
 
 class Test{
+
+
     public static void main(String args[]){
-        Test test = new Test();
-        test.sum();
+        B b = new B();
+        b.sibil();
     }
 
-    void sum(){
+    void sum(int aa, Integer a, Boolean b, Test c, int d){
         System.out.print(-5);
     }
 
-    Test(){
-        boolean b = 3 < 2;
-        System.out.print(3 < 5 * 2);
+}
+
+class B extends Test {
+    void sibil(){
+        System.out.print("sibiiil");
     }
+
 }

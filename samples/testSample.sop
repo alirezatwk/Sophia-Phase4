@@ -1,5 +1,9 @@
 class Main {
     def Main() {
-        print(!false);
+        print(this.getSum());
+    }
+
+    def int getSum(){
+        return 3;
     }
 }
