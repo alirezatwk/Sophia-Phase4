@@ -295,9 +295,14 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(PrintStmt print) {
-        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream;"); // TODO: Just for checking.
-        addCommand("iconst_2");
-        addCommand("invokevirtual java/io/PrintStream/println(I)V");
+        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream;");
+        String expressionString = print.getArg().accept(this);
+        addCommand(expressionString);
+        Type expressionType = print.getArg().accept(expressionTypeChecker);
+        if (expressionTypeChecker.isSameType(expressionType, new IntType()) || expressionTypeChecker.isSameType(expressionType, new BoolType()))
+            addCommand("invokevirtual java/io/PrintStream/print(I)V");
+        else if (expressionTypeChecker.isSameType(expressionType, new StringType()))
+            addCommand("invokevirtual java/io/PrintStream/print(Ljava/lang/String;)V");
         return null;
     }
 
@@ -341,20 +346,24 @@ public class CodeGenerator extends Visitor<String> {
     public String visit(BinaryExpression binaryExpression) {
         BinaryOperator operator = binaryExpression.getBinaryOperator();
         String commands = "";
+        commands += binaryExpression.getFirstOperand().accept(this);
+        commands += '\n';
+        commands += binaryExpression.getSecondOperand().accept(this);
+        commands += '\n';
         if (operator == BinaryOperator.add) {
-            //todo
+            commands += "iadd";
         }
         else if (operator == BinaryOperator.sub) {
-            //todo
+            commands += "isub";
         }
         else if (operator == BinaryOperator.mult) {
-            //todo
+            commands += "imul";
         }
         else if (operator == BinaryOperator.div) {
-            //todo
+            commands += "idiv";
         }
         else if (operator == BinaryOperator.mod) {
-            //todo
+            commands += "irem";
         }
         else if((operator == BinaryOperator.gt) || (operator == BinaryOperator.lt)) {
             //todo
@@ -402,10 +411,13 @@ public class CodeGenerator extends Visitor<String> {
         UnaryOperator operator = unaryExpression.getOperator();
         String commands = "";
         if(operator == UnaryOperator.minus) {
-            //todo
+            commands += unaryExpression.getOperand().accept(this);
+            commands += '\n';
+            commands += "ineg";
         }
         else if(operator == UnaryOperator.not) {
-            //todo
+            //commands += unaryExpression.getOperand().accept(this);
+
         }
         else if((operator == UnaryOperator.predec) || (operator == UnaryOperator.preinc)) {
             if(unaryExpression.getOperand() instanceof Identifier) {
@@ -519,29 +531,36 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(NullValue nullValue) {
-        String commands = "";
-        //todo
+        String commands = "aconst_null";
         return commands;
     }
 
     @Override
     public String visit(IntValue intValue) {
         String commands = "";
-        //todo
+        if (0 <= intValue.getConstant() && intValue.getConstant() <= 5)
+            commands += "iconst_";
+        else
+            commands += "bipush ";
+        commands += Integer.toString(intValue.getConstant());
         return commands;
     }
 
     @Override
     public String visit(BoolValue boolValue) {
         String commands = "";
-        //todo
+        if (boolValue.getConstant())
+            commands += "iconst_1";
+        else
+            commands += "iconst_0";
         return commands;
     }
 
     @Override
     public String visit(StringValue stringValue) {
-        String commands = "";
-        //todo
+        String commands = "ldc \"";
+        commands += stringValue.getConstant();
+        commands += "\"";
         return commands;
     }
 

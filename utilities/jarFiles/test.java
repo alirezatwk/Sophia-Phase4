@@ -1,5 +1,16 @@
+import java.lang.Integer;
+
 class Test{
     public static void main(String args[]){
-        System.out.println(3);
+        Test test = new Test();
+        test.sum();
+    }
+
+    void sum(){
+        System.out.print(-5);
+    }
+
+    Test(){
+        System.out.print(new Integer(3));
     }
 }
