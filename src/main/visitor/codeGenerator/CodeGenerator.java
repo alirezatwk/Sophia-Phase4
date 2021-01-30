@@ -70,15 +70,15 @@ public class CodeGenerator extends Visitor<String> {
         String jasminPath = "utilities/jarFiles/jasmin.jar";
         String listClassPath = "utilities/codeGenerationUtilityClasses/List.j";
         String fptrClassPath = "utilities/codeGenerationUtilityClasses/Fptr.j";
-        try{
+        try {
             File directory = new File(this.outputPath);
             File[] files = directory.listFiles();
-            if(files != null)
+            if (files != null)
                 for (File file : files)
                     file.delete();
             directory.mkdir();
+        } catch (SecurityException e) {
         }
-        catch(SecurityException e) { }
         copyFile(jasminPath, this.outputPath + "jasmin.jar");
         copyFile(listClassPath, this.outputPath + "List.j");
         copyFile(fptrClassPath, this.outputPath + "Fptr.j");
@@ -96,7 +96,8 @@ public class CodeGenerator extends Visitor<String> {
                 writingFileStream.write(buffer, 0, readLength);
             readingFileStream.close();
             writingFileStream.close();
-        } catch (IOException e) { }
+        } catch (IOException e) {
+        }
     }
 
     private void createFile(String name) {
@@ -106,20 +107,22 @@ public class CodeGenerator extends Visitor<String> {
             file.createNewFile();
             FileWriter fileWriter = new FileWriter(path);
             this.currentFile = fileWriter;
-        } catch (IOException e) {}
+        } catch (IOException e) {
+        }
     }
 
     private void addCommand(String command) {
         try {
             command = String.join("\n\t\t", command.split("\n"));
-            if(command.startsWith("Label_"))
+            if (command.startsWith("Label_"))
                 this.currentFile.write("\t" + command + "\n");
-            else if(command.startsWith("."))
+            else if (command.startsWith("."))
                 this.currentFile.write(command + "\n");
             else
                 this.currentFile.write("\t\t" + command + "\n");
             this.currentFile.flush();
-        } catch (IOException e) {}
+        } catch (IOException e) {
+        }
     }
 
     private String makeTypeSignature(Type t) {
@@ -145,7 +148,7 @@ public class CodeGenerator extends Visitor<String> {
         if (this.currentClass.getParentClassName() == null)
             addCommand("invokespecial java/lang/Object/<init>()V");
         else
-            addCommand("invokespecial " + currentClass.getParentClassName().getName() + "/<init>()V"); // TODO: Maybe has arguments
+            addCommand("invokespecial " + currentClass.getParentClassName().getName() + "/<init>()V");
 
         for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
             addCommand("aload_0");
@@ -155,31 +158,26 @@ public class CodeGenerator extends Visitor<String> {
                 addCommand("dup");
                 addCommand("iconst_0");
                 addCommand("invokespecial java/lang/Integer/<init>(I)V");
-            }
-            else if (fieldType instanceof BoolType) {
+            } else if (fieldType instanceof BoolType) {
                 addCommand("new java/lang/Boolean");
                 addCommand("dup");
                 addCommand("iconst_0");
                 addCommand("invokespecial java/lang/Boolean/<init>(Z)V");
-            }
-            else if (fieldType instanceof StringType) {
+            } else if (fieldType instanceof StringType) {
                 addCommand("new java/lang/String");
                 addCommand("dup");
                 addCommand("ldc \"\"");
                 addCommand("invokespecial java/lang/String/<init>(Ljava/lang/String;)V");
-            }
-            else if (fieldType instanceof ListType) {
-                ArrayList<ListNameType> listNameTypes = ((ListType)fieldType).getElementsTypes();
+            } else if (fieldType instanceof ListType) {
+                ArrayList<ListNameType> listNameTypes = ((ListType) fieldType).getElementsTypes();
                 addCommand("new List");
                 addCommand("dup ");
                 for (ListNameType listNameType : listNameTypes) {
                     // TODO: shitttt.
                 }
-            }
-            else if (fieldType instanceof FptrType) {
+            } else if (fieldType instanceof FptrType) {
                 addCommand("aconst_null");
-            }
-            else if (fieldType instanceof ClassType) {
+            } else if (fieldType instanceof ClassType) {
                 addCommand("aconst_null");
             }
             addCommand("putfield " + currentClass.getClassName().getName() + "/" + fieldDeclaration.getVarDeclaration().getVarName().getName() + " " + makeTypeSignature(fieldDeclaration.getVarDeclaration().getType()));
@@ -187,6 +185,7 @@ public class CodeGenerator extends Visitor<String> {
 
         addCommand("return");
         addCommand(".end method");
+        addCommand("");
     }
 
     private void addStaticMainMethod() {
@@ -200,11 +199,11 @@ public class CodeGenerator extends Visitor<String> {
 
     private int slotOf(String identifier) {
         if (identifier.equals("")) {
-            this.tempVariable += 1;
-            return this.currentSlot.size() + this.tempVariable - 1;
+            tempVariable += 1;
+            return currentSlot.size() + tempVariable - 1;
         }
-        for (int i = 0; i < this.currentSlot.size(); i++)
-            if (this.currentSlot.get(i).equals(identifier))
+        for (int i = 0; i < currentSlot.size(); i++)
+            if (currentSlot.get(i).equals(identifier))
                 return i;
         return 0;
     }
@@ -212,8 +211,7 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(Program program) {
         ArrayList<ClassDeclaration> classes = program.getClasses();
-        for (ClassDeclaration classDec : classes)
-        {
+        for (ClassDeclaration classDec : classes) {
             this.currentClass = classDec;
             this.expressionTypeChecker.setCurrentClass(classDec);
             classDec.accept(this);
@@ -225,35 +223,35 @@ public class CodeGenerator extends Visitor<String> {
     public String visit(ClassDeclaration classDeclaration) {
         createFile(classDeclaration.getClassName().getName());
         addCommand(".class " + classDeclaration.getClassName().getName());
-        if(classDeclaration.getParentClassName() == null)
+        if (classDeclaration.getParentClassName() == null)
             addCommand(".super java/lang/Object");
         else
             addCommand(".super " + classDeclaration.getParentClassName().getName());
         addCommand("");
 
-        for(FieldDeclaration fieldDec : classDeclaration.getFields())
+        for (FieldDeclaration fieldDec : classDeclaration.getFields())
             fieldDec.accept(this);
-        if(classDeclaration.getConstructor() != null) {
+        if (classDeclaration.getConstructor() != null) {
             this.currentMethod = classDeclaration.getConstructor();
             this.expressionTypeChecker.setCurrentMethod(classDeclaration.getConstructor());
             classDeclaration.getConstructor().accept(this);
-        }
-        else {
+        } else {
             this.addDefaultConstructor();
         }
-        for(MethodDeclaration methodDec : classDeclaration.getMethods())
-        {
+        for (MethodDeclaration methodDec : classDeclaration.getMethods()) {
             this.currentMethod = methodDec;
             this.expressionTypeChecker.setCurrentMethod(methodDec);
             methodDec.accept(this);
         }
-        if(classDeclaration.getClassName().getName().equals("Main"))
+        if (classDeclaration.getClassName().getName().equals("Main"))
             addStaticMainMethod();
         return null;
     }
 
     @Override
     public String visit(ConstructorDeclaration constructorDeclaration) {
+        if (constructorDeclaration.getArgs().size() != 0)
+            addDefaultConstructor();
         this.visit((MethodDeclaration) constructorDeclaration);
         return null;
     }
@@ -273,7 +271,7 @@ public class CodeGenerator extends Visitor<String> {
             //todo call parent constructor
             //todo initialize fields
         }
-        for(Statement statement : methodDeclaration.getBody())
+        for (Statement statement : methodDeclaration.getBody())
             statement.accept(this);
         //todo visit local vars and body and add return if needed
         addCommand("return"); // TODO: Check return type
@@ -284,24 +282,60 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(FieldDeclaration fieldDeclaration) {
         //todo
+        String command = "";
+        command += ".field ";
+        command += fieldDeclaration.getVarDeclaration().getVarName().getName();
+        if (expressionTypeChecker.isSameType(fieldDeclaration.getVarDeclaration().getType(), new IntType()))
+            command += " I";
+        else if (expressionTypeChecker.isSameType(fieldDeclaration.getVarDeclaration().getType(), new BoolType()))
+            command += " B";
+        else if (expressionTypeChecker.isSameType(fieldDeclaration.getVarDeclaration().getType(), new StringType()))
+            command += " Ljava/lang/String";
+        else if (expressionTypeChecker.isSameType(fieldDeclaration.getVarDeclaration().getType(), new ListType())) {
+            command += " [";
+//            list element visitor call
+        }
+        addCommand(command);
         return null;
     }
 
     @Override
     public String visit(VarDeclaration varDeclaration) {
         //todo
+        Type varType = varDeclaration.getType();
+        if (varType instanceof IntType) {
+            addCommand("new java/lang/Integer");
+            addCommand("iconst_0");
+        } else if (varType instanceof BoolType) {
+            addCommand("new java/lang/Boolean");
+            addCommand("iconst_0");
+        } else if (varType instanceof StringType) {
+            addCommand("new java/lang/String");
+            addCommand("ldc \"\"");
+        } else if (varType instanceof ListType) {
+            ArrayList<ListNameType> listNameTypes = ((ListType) varType).getElementsTypes();
+            addCommand("new List");
+        }
         return null;
     }
 
     @Override
     public String visit(AssignmentStmt assignmentStmt) {
         //todo
+        Expression lValue = assignmentStmt.getlValue();
+        Expression rValue = assignmentStmt.getrValue();
+        rValue.accept(this);
+        lValue.accept(this);
+        addCommand("pop");
         return null;
     }
 
     @Override
     public String visit(BlockStmt blockStmt) {
         //todo
+        for (Statement stmt : blockStmt.getStatements()) {
+            stmt.accept(this);
+        }
         return null;
     }
 
@@ -333,10 +367,9 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(ReturnStmt returnStmt) {
         Type type = returnStmt.getReturnedExpr().accept(expressionTypeChecker);
-        if(type instanceof NullType) {
+        if (type instanceof NullType) {
             addCommand("return");
-        }
-        else {
+        } else {
             //todo add commands to return
         }
         return null;
@@ -366,7 +399,7 @@ public class CodeGenerator extends Visitor<String> {
         return null;
     }
 
-    private int makeLabel(){
+    private int makeLabel() {
         addCommand("Label" + Integer.toString(this.labelCounter));
         this.labelCounter += 1;
         return this.labelCounter - 1;
@@ -380,20 +413,15 @@ public class CodeGenerator extends Visitor<String> {
         commands += binaryExpression.getSecondOperand().accept(this);
         if (operator == BinaryOperator.add) {
             commands += "iadd\n";
-        }
-        else if (operator == BinaryOperator.sub) {
+        } else if (operator == BinaryOperator.sub) {
             commands += "isub\n";
-        }
-        else if (operator == BinaryOperator.mult) {
+        } else if (operator == BinaryOperator.mult) {
             commands += "imul\n";
-        }
-        else if (operator == BinaryOperator.div) {
+        } else if (operator == BinaryOperator.div) {
             commands += "idiv\n";
-        }
-        else if (operator == BinaryOperator.mod) {
+        } else if (operator == BinaryOperator.mod) {
             commands += "irem\n";
-        }
-        else if((operator == BinaryOperator.gt) || (operator == BinaryOperator.lt)) {
+        } else if ((operator == BinaryOperator.gt) || (operator == BinaryOperator.lt)) {
             commands += "if_icmp" + operator.toString() + " Label" + Integer.toString(this.labelCounter);
             commands += '\n';
             commands += "iconst_0\n";
@@ -403,8 +431,7 @@ public class CodeGenerator extends Visitor<String> {
             commands += "iconst_1\n";
             commands += "Label" + Integer.toString(this.labelCounter + 1) + ":\n";
             this.labelCounter += 2;
-        }
-        else if((operator == BinaryOperator.eq) || (operator == BinaryOperator.neq)) {
+        } else if ((operator == BinaryOperator.eq) || (operator == BinaryOperator.neq)) {
             commands += "if_icmp" + operator.toString().substring(0, 2) + " Label" + Integer.toString(this.labelCounter);
             commands += '\n';
             commands += "iconst_0\n";
@@ -414,35 +441,29 @@ public class CodeGenerator extends Visitor<String> {
             commands += "iconst_1\n";
             commands += "Label" + Integer.toString(this.labelCounter + 1) + ":\n";
             this.labelCounter += 2;
-        }
-        else if(operator == BinaryOperator.and) {
+        } else if (operator == BinaryOperator.and) {
             commands += "iand\n";
-        }
-        else if(operator == BinaryOperator.or) {
+        } else if (operator == BinaryOperator.or) {
             commands += "ior\n";
-        }
-        else if(operator == BinaryOperator.assign) {
+        } else if (operator == BinaryOperator.assign) {
             Type firstType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);
             String secondOperandCommands = binaryExpression.getSecondOperand().accept(this);
-            if(firstType instanceof ListType) {
+            if (firstType instanceof ListType) {
                 //todo make new list with List copy constructor with the second operand commands
                 // (add these commands to secondOperandCommands)
             }
-            if(binaryExpression.getFirstOperand() instanceof Identifier) {
+            if (binaryExpression.getFirstOperand() instanceof Identifier) {
                 //todo
-            }
-            else if(binaryExpression.getFirstOperand() instanceof ListAccessByIndex) {
+            } else if (binaryExpression.getFirstOperand() instanceof ListAccessByIndex) {
                 //todo
-            }
-            else if(binaryExpression.getFirstOperand() instanceof ObjectOrListMemberAccess) {
+            } else if (binaryExpression.getFirstOperand() instanceof ObjectOrListMemberAccess) {
                 Expression instance = ((ObjectOrListMemberAccess) binaryExpression.getFirstOperand()).getInstance();
                 Type memberType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);
                 String memberName = ((ObjectOrListMemberAccess) binaryExpression.getFirstOperand()).getMemberName().getName();
                 Type instanceType = instance.accept(expressionTypeChecker);
-                if(instanceType instanceof ListType) {
+                if (instanceType instanceof ListType) {
                     //todo
-                }
-                else if(instanceType instanceof ClassType) {
+                } else if (instanceType instanceof ClassType) {
                     //todo
                 }
             }
@@ -455,10 +476,9 @@ public class CodeGenerator extends Visitor<String> {
         UnaryOperator operator = unaryExpression.getOperator();
         String commands = "";
         commands += unaryExpression.getOperand().accept(this);
-        if(operator == UnaryOperator.minus) {
+        if (operator == UnaryOperator.minus) {
             commands += "ineg\n";
-        }
-        else if(operator == UnaryOperator.not) {
+        } else if (operator == UnaryOperator.not) {
             commands += "ifeq" + " Label" + Integer.toString(this.labelCounter);
             commands += '\n';
             commands += "iconst_0\n";
@@ -468,43 +488,35 @@ public class CodeGenerator extends Visitor<String> {
             commands += "iconst_1\n";
             commands += "Label" + Integer.toString(this.labelCounter + 1) + ":\n";
             this.labelCounter += 2;
-        }
-        else if((operator == UnaryOperator.predec) || (operator == UnaryOperator.preinc)) {
-            if(unaryExpression.getOperand() instanceof Identifier) {
+        } else if ((operator == UnaryOperator.predec) || (operator == UnaryOperator.preinc)) {
+            if (unaryExpression.getOperand() instanceof Identifier) {
                 //todo
-            }
-            else if(unaryExpression.getOperand() instanceof ListAccessByIndex) {
+            } else if (unaryExpression.getOperand() instanceof ListAccessByIndex) {
                 //todo
-            }
-            else if(unaryExpression.getOperand() instanceof ObjectOrListMemberAccess) {
+            } else if (unaryExpression.getOperand() instanceof ObjectOrListMemberAccess) {
                 Expression instance = ((ObjectOrListMemberAccess) unaryExpression.getOperand()).getInstance();
                 Type memberType = unaryExpression.getOperand().accept(expressionTypeChecker);
                 String memberName = ((ObjectOrListMemberAccess) unaryExpression.getOperand()).getMemberName().getName();
                 Type instanceType = instance.accept(expressionTypeChecker);
-                if(instanceType instanceof ListType) {
+                if (instanceType instanceof ListType) {
+                    //todo
+                } else if (instanceType instanceof ClassType) {
                     //todo
                 }
-                else if(instanceType instanceof ClassType) {
-                    //todo
-                }
             }
-        }
-        else if((operator == UnaryOperator.postdec) || (operator == UnaryOperator.postinc)) {
-            if(unaryExpression.getOperand() instanceof Identifier) {
+        } else if ((operator == UnaryOperator.postdec) || (operator == UnaryOperator.postinc)) {
+            if (unaryExpression.getOperand() instanceof Identifier) {
                 //todo
-            }
-            else if(unaryExpression.getOperand() instanceof ListAccessByIndex) {
+            } else if (unaryExpression.getOperand() instanceof ListAccessByIndex) {
                 //todo
-            }
-            else if(unaryExpression.getOperand() instanceof ObjectOrListMemberAccess) {
+            } else if (unaryExpression.getOperand() instanceof ObjectOrListMemberAccess) {
                 Expression instance = ((ObjectOrListMemberAccess) unaryExpression.getOperand()).getInstance();
                 Type memberType = unaryExpression.getOperand().accept(expressionTypeChecker);
                 String memberName = ((ObjectOrListMemberAccess) unaryExpression.getOperand()).getMemberName().getName();
                 Type instanceType = instance.accept(expressionTypeChecker);
-                if(instanceType instanceof ListType) {
+                if (instanceType instanceof ListType) {
                     //todo
-                }
-                else if(instanceType instanceof ClassType) {
+                } else if (instanceType instanceof ClassType) {
                     //todo
                 }
             }
@@ -518,7 +530,7 @@ public class CodeGenerator extends Visitor<String> {
         Type instanceType = objectOrListMemberAccess.getInstance().accept(expressionTypeChecker);
         String memberName = objectOrListMemberAccess.getMemberName().getName();
         String commands = "";
-        if(instanceType instanceof ClassType) {
+        if (instanceType instanceof ClassType) {
             String className = ((ClassType) instanceType).getClassName().getName();
             try {
                 SymbolTable classSymbolTable = ((ClassSymbolTableItem) SymbolTable.root.getItem(ClassSymbolTableItem.START_KEY + className, true)).getClassSymbolTable();
@@ -530,8 +542,7 @@ public class CodeGenerator extends Visitor<String> {
                 }
             } catch (ItemNotFoundException classNotFound) {
             }
-        }
-        else if(instanceType instanceof ListType) {
+        } else if (instanceType instanceof ListType) {
             //todo
         }
         return commands;
@@ -540,14 +551,50 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(Identifier identifier) {
         String commands = "";
-        //todo
+        int slot = slotOf(identifier.getName());
+        try {
+            ClassSymbolTableItem classSymbolTableItem = (ClassSymbolTableItem) SymbolTable.root.getItem(ClassSymbolTableItem.START_KEY + this.currentClass.getClassName().getName(), true);
+            SymbolTable classSymbolTable = classSymbolTableItem.getClassSymbolTable();
+            MethodSymbolTableItem methodSymbolTableItem = (MethodSymbolTableItem) classSymbolTable.getItem(MethodSymbolTableItem.START_KEY + this.currentMethod.getMethodName().getName(), true);
+            SymbolTable methodSymbolTable = methodSymbolTableItem.getMethodSymbolTable();
+            LocalVariableSymbolTableItem localVariableSymbolTableItem = (LocalVariableSymbolTableItem) methodSymbolTable.getItem(LocalVariableSymbolTableItem.START_KEY + identifier.getName(), true);
+            Type varType = localVariableSymbolTableItem.getType();
+            if (varType instanceof IntType) {
+                commands += "aload" + underlineOrSpace(slot) + slot + "\n";
+                commands += "invokevirtual java/lang/Integer/intValue()I\n";
+
+            } else if (varType instanceof BoolType) {
+                commands += "aload" + underlineOrSpace(slot) + slot + "\n";
+                commands += "invokevirtual java/lang/Boolean/booleanValue()Z\n";
+            } else {
+                commands += "aload" + underlineOrSpace(slot) + slot + "\n";
+            }
+        } catch (ItemNotFoundException ignored) {
+        }
+
         return commands;
     }
 
     @Override
     public String visit(ListAccessByIndex listAccessByIndex) {
         String commands = "";
-        //todo
+        commands += listAccessByIndex.getInstance().accept(this);
+        commands += listAccessByIndex.getIndex().accept(this);
+        commands += "invokevirtual List/getElement(I)Ljava/lang/Object;\n";
+
+        Type elementType = ((ListType) listAccessByIndex.getInstance().accept(expressionTypeChecker)).getElementsTypes().get(((IntValue) listAccessByIndex.getIndex()).getConstant()).getType();
+
+        if (elementType instanceof IntType) {
+            commands += "checkcast java/lang/Integer\n";
+            commands += "invokevirtual java/lang/Integer/intValue()I\n";
+        } else if (elementType instanceof BoolType) {
+            commands += "checkcast java/lang/Boolean\n";
+            commands += "invokevirtual java/lang/Boolean/booleanValue()Z\n";
+        } else if (elementType instanceof StringType) {
+            commands += "checkcast java/lang/String\n";
+        } else if (elementType instanceof ClassType) {
+            commands += "checkcast " + ((ClassType) elementType).getClassName().getName() + "\n";
+        }
         return commands;
     }
 
@@ -565,14 +612,12 @@ public class CodeGenerator extends Visitor<String> {
                 commands += "dup\n";
                 commands += arg.accept(this);
                 commands += "invokespecial java/lang/Integer/<init>(I)V\n";
-            }
-            else if (argType instanceof BoolType) {
+            } else if (argType instanceof BoolType) {
                 commands += "new java/lang/Boolean\n";
                 commands += "dup\n";
                 commands += arg.accept(this);
                 commands += "invokespecial java/lang/Boolean/<init>(Z)V\n";
-            }
-            else {
+            } else {
                 commands += arg.accept(this);
             }
             commands += "invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z\n";
@@ -583,18 +628,14 @@ public class CodeGenerator extends Visitor<String> {
         if (returnType instanceof IntType) {
             commands += "checkcast java/lang/Integer\n";
             commands += "invokevirtual java/lang/Integer/intValue()I\n";
-        }
-        else if (returnType instanceof BoolType) {
+        } else if (returnType instanceof BoolType) {
             commands += "checkcast java/lang/Boolean\n";
             commands += "invokevirtual java/lang/Boolean/booleanValue()Z\n";
-        }
-        else if (returnType instanceof StringType) {
+        } else if (returnType instanceof StringType) {
             commands += "checkcast java/lang/String\n";
-        }
-        else if (returnType instanceof ClassType) {
+        } else if (returnType instanceof ClassType) {
             commands += "checkcast " + ((ClassType) returnType).getClassName().getName() + "\n";
-        }
-        else if (returnType instanceof NullType) {
+        } else if (returnType instanceof NullType) {
             commands += "pop\n";
         }
         return commands;
@@ -613,14 +654,12 @@ public class CodeGenerator extends Visitor<String> {
                 commands += "dup\n";
                 commands += arg.accept(this);
                 commands += "invokespecial java/lang/Integer/<init>(I)V\n";
-            }
-            else if (argType instanceof BoolType) {
+            } else if (argType instanceof BoolType) {
                 commands += "new java/lang/Boolean\n";
                 commands += "dup\n";
                 commands += arg.accept(this);
                 commands += "invokespecial java/lang/Boolean/<init>(Z)V\n";
-            }
-            else {
+            } else {
                 commands += arg.accept(this);
             }
             argString += makeTypeSignature(argType);
@@ -651,14 +690,12 @@ public class CodeGenerator extends Visitor<String> {
                 commands += "dup\n";
                 commands += expr.accept(this);
                 commands += "invokespecial java/lang/Integer/<init>(I)V\n";
-            }
-            else if (exprType instanceof BoolType) {
+            } else if (exprType instanceof BoolType) {
                 commands += "new java/lang/Boolean\n";
                 commands += "dup\n";
                 commands += expr.accept(this);
                 commands += "invokespecial java/lang/Boolean/<init>(Z)V\n";
-            }
-            else {
+            } else {
                 commands += expr.accept(this);
             }
         }
