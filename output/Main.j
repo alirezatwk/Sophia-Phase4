@@ -7,22 +7,13 @@
 		aload_0
 		invokespecial java/lang/Object/<init>()V
 		getstatic java/lang/System/out Ljava/io/PrintStream;
-		bipush 100
-		ineg
-		bipush 10
-		iadd
-		bipush 20
-		iadd
-		bipush 10
-		bipush 32
-		imul
-		bipush 7
-		idiv
-		isub
-		bipush 32
-		iconst_3
-		irem
-		iadd
+		iconst_0
+		ifeq Label0
+		iconst_0
+		goto Label1
+		Label0:
+		iconst_1
+		Label1:
 		invokevirtual java/io/PrintStream/print(I)V
 		return
 .end method

@@ -46,11 +46,20 @@ public class CodeGenerator extends Visitor<String> {
     Graph<String> classHierarchy;
     private String outputPath;
     private FileWriter currentFile;
+
     private ClassDeclaration currentClass;
     private MethodDeclaration currentMethod;
+
+    private int labelCounter;
+
+    private ArrayList<String> currentSlot;
+    private int tempVariable;
+
     static String methodHeader = ".limit stack 128\n" + ".limit locals 128";
 
     public CodeGenerator(Graph<String> classHierarchy) {
+        this.labelCounter = 0;
+        this.tempVariable = 0;
         this.classHierarchy = classHierarchy;
         this.expressionTypeChecker = new ExpressionTypeChecker(classHierarchy);
         this.prepareOutputFolder();
@@ -132,48 +141,13 @@ public class CodeGenerator extends Visitor<String> {
     }
 
     private int slotOf(String identifier) {
-        //todo
-        if(identifier == "")
-        {
-            int s = 0;
-            s += currentClass.getFields().size();
-            s += currentMethod.getArgs().size();
-            s += currentMethod.getLocalVars().size();
-            s += 1;
-            return s;
-//            May have bug with more than one temp variable declarations in one method
+        if (identifier.equals("")) {
+            this.tempVariable += 1;
+            return this.currentSlot.size() + this.tempVariable - 1;
         }
-        if(identifier.equals(currentClass.getClassName().getName()))
-        {
-            int s = 0;
-            return s;
-        }
-        int index = 0;
-        for (FieldDeclaration fieldDec : currentClass.getFields())
-        {
-            if (fieldDec.getVarDeclaration().getVarName().getName() == identifier)
-                return index;
-            index += 1;
-        }
-        for(MethodDeclaration methodDec : currentClass.getMethods())
-        {
-            int prev = index;
-            if(methodDec.getMethodName().getName().equals(identifier))
-                return index;
-            for(VarDeclaration argDec : methodDec.getArgs())
-            {
-                if(argDec.getVarName().getName().equals(identifier))
-                    return index;
-                index += 1;
-            }
-            for(VarDeclaration localVar : methodDec.getLocalVars())
-            {
-                if(localVar.getVarName().getName().equals(identifier))
-                    return index;
-                index += 1;
-            }
-            index = prev;
-            index += 1;
+        for (int i = 0; i < this.currentSlot.size(); i++) {
+            if (this.currentSlot.get(i).equals(identifier))
+                return i;
         }
         return 0;
     }
@@ -342,40 +316,60 @@ public class CodeGenerator extends Visitor<String> {
         return null;
     }
 
+    private int makeLabel(){
+        addCommand("Label" + Integer.toString(this.labelCounter));
+        this.labelCounter += 1;
+        return this.labelCounter - 1;
+    }
+
     @Override
     public String visit(BinaryExpression binaryExpression) {
         BinaryOperator operator = binaryExpression.getBinaryOperator();
         String commands = "";
         commands += binaryExpression.getFirstOperand().accept(this);
-        commands += '\n';
         commands += binaryExpression.getSecondOperand().accept(this);
-        commands += '\n';
         if (operator == BinaryOperator.add) {
-            commands += "iadd";
+            commands += "iadd\n";
         }
         else if (operator == BinaryOperator.sub) {
-            commands += "isub";
+            commands += "isub\n";
         }
         else if (operator == BinaryOperator.mult) {
-            commands += "imul";
+            commands += "imul\n";
         }
         else if (operator == BinaryOperator.div) {
-            commands += "idiv";
+            commands += "idiv\n";
         }
         else if (operator == BinaryOperator.mod) {
-            commands += "irem";
+            commands += "irem\n";
         }
         else if((operator == BinaryOperator.gt) || (operator == BinaryOperator.lt)) {
-            //todo
+            commands += "if_icmp" + operator.toString() + " Label" + Integer.toString(this.labelCounter);
+            commands += '\n';
+            commands += "iconst_0\n";
+            commands += "goto Label" + Integer.toString(this.labelCounter + 1);
+            commands += '\n';
+            commands += "Label" + Integer.toString(this.labelCounter) + ":\n";
+            commands += "iconst_1\n";
+            commands += "Label" + Integer.toString(this.labelCounter + 1) + ":\n";
+            this.labelCounter += 2;
         }
         else if((operator == BinaryOperator.eq) || (operator == BinaryOperator.neq)) {
-            //todo
+            commands += "if_icmp" + operator.toString().substring(0, 2) + " Label" + Integer.toString(this.labelCounter);
+            commands += '\n';
+            commands += "iconst_0\n";
+            commands += "goto Label" + Integer.toString(this.labelCounter + 1);
+            commands += '\n';
+            commands += "Label" + Integer.toString(this.labelCounter) + ":\n";
+            commands += "iconst_1\n";
+            commands += "Label" + Integer.toString(this.labelCounter + 1) + ":\n";
+            this.labelCounter += 2;
         }
         else if(operator == BinaryOperator.and) {
-            //todo
+            commands += "iand\n";
         }
         else if(operator == BinaryOperator.or) {
-            //todo
+            commands += "ior\n";
         }
         else if(operator == BinaryOperator.assign) {
             Type firstType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);
@@ -410,14 +404,20 @@ public class CodeGenerator extends Visitor<String> {
     public String visit(UnaryExpression unaryExpression) {
         UnaryOperator operator = unaryExpression.getOperator();
         String commands = "";
+        commands += unaryExpression.getOperand().accept(this);
         if(operator == UnaryOperator.minus) {
-            commands += unaryExpression.getOperand().accept(this);
-            commands += '\n';
-            commands += "ineg";
+            commands += "ineg\n";
         }
         else if(operator == UnaryOperator.not) {
-            //commands += unaryExpression.getOperand().accept(this);
-
+            commands += "ifeq" + " Label" + Integer.toString(this.labelCounter);
+            commands += '\n';
+            commands += "iconst_0\n";
+            commands += "goto Label" + Integer.toString(this.labelCounter + 1);
+            commands += '\n';
+            commands += "Label" + Integer.toString(this.labelCounter) + ":\n";
+            commands += "iconst_1\n";
+            commands += "Label" + Integer.toString(this.labelCounter + 1) + ":\n";
+            this.labelCounter += 2;
         }
         else if((operator == UnaryOperator.predec) || (operator == UnaryOperator.preinc)) {
             if(unaryExpression.getOperand() instanceof Identifier) {
@@ -531,7 +531,7 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(NullValue nullValue) {
-        String commands = "aconst_null";
+        String commands = "aconst_null\n";
         return commands;
     }
 
@@ -543,6 +543,7 @@ public class CodeGenerator extends Visitor<String> {
         else
             commands += "bipush ";
         commands += Integer.toString(intValue.getConstant());
+        commands += '\n';
         return commands;
     }
 
@@ -553,6 +554,7 @@ public class CodeGenerator extends Visitor<String> {
             commands += "iconst_1";
         else
             commands += "iconst_0";
+        commands += '\n';
         return commands;
     }
 
@@ -560,7 +562,7 @@ public class CodeGenerator extends Visitor<String> {
     public String visit(StringValue stringValue) {
         String commands = "ldc \"";
         commands += stringValue.getConstant();
-        commands += "\"";
+        commands += "\"\n";
         return commands;
     }
 

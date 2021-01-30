@@ -11,6 +11,7 @@ class Test{
     }
 
     Test(){
-        System.out.print(new Integer(3));
+        boolean b = 3 < 2;
+        System.out.print(3 < 5 * 2);
     }
 }
