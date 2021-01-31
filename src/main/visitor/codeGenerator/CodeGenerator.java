@@ -322,6 +322,35 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(AssignmentStmt assignmentStmt) {
         //todo
+        int slot = this.slotOf(assignmentStmt.getlValue().toString());
+        Value lValue = (Value)assignmentStmt.getlValue();
+        if (lValue instanceof IntValue)
+        {
+            String command = "";
+            command += "iload";
+            command += slot < 4 ? "_" + Integer.toString(slot) : " " + Integer.toString(slot);
+            command += "\n";
+            Expression rValue = assignmentStmt.getrValue();
+            command += "iconst";
+            int rv = Integer.parseInt(assignmentStmt.getrValue().toString());
+            command += rv < 4 ? "_" + Integer.toString(rv) : " " + Integer.toString(rv);
+            command += "\n";
+            command += "istore";
+            command += slot < 4 ? "_" + Integer.toString(slot) : " " + Integer.toString(slot);
+            addCommand(command);
+        }
+        else if (lValue instanceof BoolValue)
+        {
+//            here Under Construction
+        }
+        else if (lValue instanceof StringValue)
+        {
+
+        }
+        else if (lValue instanceof ListValue)
+        {
+
+        }
         Expression lValue = assignmentStmt.getlValue();
         Expression rValue = assignmentStmt.getrValue();
         rValue.accept(this);
@@ -348,6 +377,15 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(MethodCallStmt methodCallStmt) {
         //todo
+        expressionTypeChecker.setIsInMethodCallStmt(true);
+
+        methodCallStmt.accept(this);
+        String command = "";
+        command += "invoke";
+        command += methodCallStmt.getMethodCall();
+        addCommand("pop");
+        addCommand("return");
+        expressionTypeChecker.setIsInMethodCallStmt(false);
         return null;
     }
 
@@ -551,27 +589,6 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(Identifier identifier) {
         String commands = "";
-        int slot = slotOf(identifier.getName());
-        try {
-            ClassSymbolTableItem classSymbolTableItem = (ClassSymbolTableItem) SymbolTable.root.getItem(ClassSymbolTableItem.START_KEY + this.currentClass.getClassName().getName(), true);
-            SymbolTable classSymbolTable = classSymbolTableItem.getClassSymbolTable();
-            MethodSymbolTableItem methodSymbolTableItem = (MethodSymbolTableItem) classSymbolTable.getItem(MethodSymbolTableItem.START_KEY + this.currentMethod.getMethodName().getName(), true);
-            SymbolTable methodSymbolTable = methodSymbolTableItem.getMethodSymbolTable();
-            LocalVariableSymbolTableItem localVariableSymbolTableItem = (LocalVariableSymbolTableItem) methodSymbolTable.getItem(LocalVariableSymbolTableItem.START_KEY + identifier.getName(), true);
-            Type varType = localVariableSymbolTableItem.getType();
-            if (varType instanceof IntType) {
-                commands += "aload" + underlineOrSpace(slot) + slot + "\n";
-                commands += "invokevirtual java/lang/Integer/intValue()I\n";
-
-            } else if (varType instanceof BoolType) {
-                commands += "aload" + underlineOrSpace(slot) + slot + "\n";
-                commands += "invokevirtual java/lang/Boolean/booleanValue()Z\n";
-            } else {
-                commands += "aload" + underlineOrSpace(slot) + slot + "\n";
-            }
-        } catch (ItemNotFoundException ignored) {
-        }
-
         return commands;
     }
 
