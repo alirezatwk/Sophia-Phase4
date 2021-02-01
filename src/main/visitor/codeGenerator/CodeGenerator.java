@@ -55,12 +55,17 @@ public class CodeGenerator extends Visitor<String> {
     private ArrayList<String> currentSlot;
     private int tempVariable;
 
+    private ArrayList<String> continueLabels;
+    private ArrayList<String> breakLabels;
+
     static String methodHeader = ".limit stack 128\n" + ".limit locals 128";
 
     public CodeGenerator(Graph<String> classHierarchy) {
         this.labelCounter = 0;
         this.tempVariable = 0;
         this.currentSlot = new ArrayList<>();
+        this.continueLabels = new ArrayList<>();
+        this.breakLabels = new ArrayList<>();
         this.classHierarchy = classHierarchy;
         this.expressionTypeChecker = new ExpressionTypeChecker(classHierarchy);
         this.prepareOutputFolder();
@@ -391,22 +396,16 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ConditionalStmt conditionalStmt) {
-        //todo
+        // TODO
         return null;
     }
 
     @Override
     public String visit(MethodCallStmt methodCallStmt) {
-        //todo
         expressionTypeChecker.setIsInMethodCallStmt(true);
-
-        methodCallStmt.accept(this);
-        String command = "";
-        command += "invoke";
-        command += methodCallStmt.getMethodCall();
-        addCommand("pop");
-        addCommand("return");
+        addCommand(methodCallStmt.getMethodCall().accept(this));
         expressionTypeChecker.setIsInMethodCallStmt(false);
+        addCommand("pop");
         return null;
     }
 
@@ -428,21 +427,34 @@ public class CodeGenerator extends Visitor<String> {
         Type type = returnStmt.getReturnedExpr().accept(expressionTypeChecker);
         if (type instanceof NullType) {
             addCommand("return");
+        } else if (type instanceof IntType) {
+            addCommand("new java/lang/Integer");
+            addCommand("dup");
+            addCommand(returnStmt.getReturnedExpr().accept(this));
+            addCommand("invokespecial java/lang/Integer/<init>(I)V");
+            addCommand("areturn");
+        } else if (type instanceof BoolType) {
+            addCommand("new java/lang/Boolean");
+            addCommand("dup");
+            addCommand(returnStmt.getReturnedExpr().accept(this));
+            addCommand("invokespecial java/lang/Boolean/<init>(Z)V");
+            addCommand("areturn");
         } else {
-            //todo add commands to return
+            addCommand(returnStmt.getReturnedExpr().accept(this));
+            addCommand("areturn");
         }
         return null;
     }
 
     @Override
     public String visit(BreakStmt breakStmt) {
-        //todo
+        addCommand("goto " + breakLabels.get(breakLabels.size() - 1));
         return null;
     }
 
     @Override
     public String visit(ContinueStmt continueStmt) {
-        //todo
+        addCommand("goto " + continueLabels.get(continueLabels.size() - 1));
         return null;
     }
 
@@ -454,14 +466,30 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ForStmt forStmt) {
-        //todo
-        return null;
-    }
+        if (forStmt.getInitialize() != null)
+            addCommand(forStmt.getInitialize().accept(this));
 
-    private int makeLabel() {
-        addCommand("Label" + Integer.toString(this.labelCounter));
-        this.labelCounter += 1;
-        return this.labelCounter - 1;
+        addCommand("Label" + Integer.toString(this.labelCounter + 3) + ":");
+        if (forStmt.getCondition() != null)
+            branch(forStmt.getCondition(), "Label" + Integer.toString(this.labelCounter), "Label" + Integer.toString(this.labelCounter + 1));
+
+        addCommand("Label" + Integer.toString(this.labelCounter) + ":");
+        if (forStmt.getBody() != null){
+            continueLabels.add("Label" + Integer.toString(this.labelCounter + 2));
+            breakLabels.add("Label" + Integer.toString(this.labelCounter + 1));
+            forStmt.getBody().accept(this);
+            continueLabels.remove(continueLabels.size() - 1);
+            breakLabels.remove(breakLabels.size() - 1);
+        }
+
+        addCommand("Label" + Integer.toString(this.labelCounter + 2) + ":");
+        if (forStmt.getUpdate() != null)
+            forStmt.getUpdate().accept(this);
+        addCommand("goto Label" + Integer.toString(this.labelCounter + 3) + ":");
+
+        addCommand("Label" + Integer.toString(this.labelCounter + 1) + ":");
+        this.labelCounter += 4;
+        return null;
     }
 
     @Override
