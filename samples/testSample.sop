@@ -1,9 +1,12 @@
 class Main {
     def Main() {
-        print(this.getSum());
+        print(3);
     }
+}
 
-    def int getSum(){
-        return 3;
+
+class Test {
+    def Test(name: string) {
+        print(3);
     }
 }

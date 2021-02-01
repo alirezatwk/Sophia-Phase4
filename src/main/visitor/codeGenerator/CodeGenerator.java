@@ -60,6 +60,7 @@ public class CodeGenerator extends Visitor<String> {
     public CodeGenerator(Graph<String> classHierarchy) {
         this.labelCounter = 0;
         this.tempVariable = 0;
+        this.currentSlot = new ArrayList<>();
         this.classHierarchy = classHierarchy;
         this.expressionTypeChecker = new ExpressionTypeChecker(classHierarchy);
         this.prepareOutputFolder();
@@ -139,50 +140,60 @@ public class CodeGenerator extends Visitor<String> {
             typeString += "LList;";
         else if (t instanceof ClassType)
             typeString += "L" + ((ClassType) t).getClassName().getName() + ";";
+        else
+            typeString += "V";
         return typeString;
     }
 
+    private void initializeType(Type type) {
+        if (type instanceof IntType) {
+            addCommand("new java/lang/Integer");
+            addCommand("dup");
+            addCommand("iconst_0");
+            addCommand("invokespecial java/lang/Integer/<init>(I)V");
+        } else if (type instanceof BoolType) {
+            addCommand("new java/lang/Boolean");
+            addCommand("dup");
+            addCommand("iconst_0");
+            addCommand("invokespecial java/lang/Boolean/<init>(Z)V");
+        } else if (type instanceof StringType) {
+            addCommand("new java/lang/String");
+            addCommand("dup");
+            addCommand("ldc \"\"");
+            addCommand("invokespecial java/lang/String/<init>(Ljava/lang/String;)V");
+        } else if (type instanceof ListType) {
+            addCommand("new List");
+            addCommand("dup ");
+
+            addCommand("new java/util/ArrayList");
+            addCommand("dup ");
+            addCommand("invokespecial java/util/ArrayList/<init>()V");
+            ArrayList<ListNameType> listNameTypes = ((ListType) type).getElementsTypes();
+            for (ListNameType listNameType : listNameTypes) {
+                addCommand("dup");
+                initializeType(listNameType.getType());
+                addCommand("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)V");
+            }
+            addCommand("invokespecial List/<init>(Ljava/util/ArrayList;)V");
+        } else if (type instanceof FptrType) {
+            addCommand("aconst_null");
+        } else if (type instanceof ClassType) {
+            addCommand("aconst_null");
+        }
+    }
+
     private void addDefaultConstructor() {
-        addCommand(".method public <init>()V" + methodHeader);
+        addCommand(".method public <init>()V\n" + methodHeader);
         addCommand("aload_0");
         if (this.currentClass.getParentClassName() == null)
             addCommand("invokespecial java/lang/Object/<init>()V");
         else
             addCommand("invokespecial " + currentClass.getParentClassName().getName() + "/<init>()V");
-
         for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
             addCommand("aload_0");
-            Type fieldType = fieldDeclaration.getVarDeclaration().getType();
-            if (fieldType instanceof IntType) {
-                addCommand("new java/lang/Integer");
-                addCommand("dup");
-                addCommand("iconst_0");
-                addCommand("invokespecial java/lang/Integer/<init>(I)V");
-            } else if (fieldType instanceof BoolType) {
-                addCommand("new java/lang/Boolean");
-                addCommand("dup");
-                addCommand("iconst_0");
-                addCommand("invokespecial java/lang/Boolean/<init>(Z)V");
-            } else if (fieldType instanceof StringType) {
-                addCommand("new java/lang/String");
-                addCommand("dup");
-                addCommand("ldc \"\"");
-                addCommand("invokespecial java/lang/String/<init>(Ljava/lang/String;)V");
-            } else if (fieldType instanceof ListType) {
-                ArrayList<ListNameType> listNameTypes = ((ListType) fieldType).getElementsTypes();
-                addCommand("new List");
-                addCommand("dup ");
-                for (ListNameType listNameType : listNameTypes) {
-                    // TODO: shitttt.
-                }
-            } else if (fieldType instanceof FptrType) {
-                addCommand("aconst_null");
-            } else if (fieldType instanceof ClassType) {
-                addCommand("aconst_null");
-            }
+            initializeType(fieldDeclaration.getVarDeclaration().getType());
             addCommand("putfield " + currentClass.getClassName().getName() + "/" + fieldDeclaration.getVarDeclaration().getVarName().getName() + " " + makeTypeSignature(fieldDeclaration.getVarDeclaration().getType()));
         }
-
         addCommand("return");
         addCommand(".end method");
         addCommand("");
@@ -206,6 +217,13 @@ public class CodeGenerator extends Visitor<String> {
             if (currentSlot.get(i).equals(identifier))
                 return i;
         return 0;
+    }
+
+    private String betweenSlot(int slot) {
+        if (slot > 4)
+            return " ";
+        else
+            return "_";
     }
 
     @Override
@@ -258,24 +276,43 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(MethodDeclaration methodDeclaration) {
-        //todo add method or constructor headers
-
         currentSlot.clear();
         currentSlot.add("this");
 
-        addCommand(".method " + /*methodDeclaration.getMethodName().getName()*/ "<init>" + '(' + ')' + 'V' + '\n' + methodHeader); // TODO: Add arguments and return type
-        addCommand("aload_0");
-        addCommand("invokespecial java/lang/Object/<init>()V");
-
         if (methodDeclaration instanceof ConstructorDeclaration) {
-            //todo call parent constructor
-            //todo initialize fields
+            String argString = "";
+            for (VarDeclaration varDeclaration : methodDeclaration.getArgs())
+                argString += makeTypeSignature(varDeclaration.getType());
+            addCommand(".method <init>(" + argString + ')' + 'V' + '\n' + methodHeader);
+            addCommand("aload_0");
+            if (this.currentClass.getParentClassName() == null)
+                addCommand("invokespecial java/lang/Object/<init>()V");
+            else
+                addCommand("invokespecial " + currentClass.getParentClassName().getName() + "/<init>()V");
+
+            for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
+                addCommand("aload_0");
+                initializeType(fieldDeclaration.getVarDeclaration().getType());
+                addCommand("putfield " + currentClass.getClassName().getName() + "/" + fieldDeclaration.getVarDeclaration().getVarName().getName() + " " + makeTypeSignature(fieldDeclaration.getVarDeclaration().getType()));
+            }
+        } else {
+            String argString = "";
+            for (VarDeclaration varDeclaration : methodDeclaration.getArgs())
+                argString += makeTypeSignature(varDeclaration.getType());
+            String returnString = makeTypeSignature(methodDeclaration.getReturnType());
+            addCommand(".method " + methodDeclaration.getMethodName().getName() + "(" + argString + ")" + returnString + '\n' + methodHeader);
         }
+        for (VarDeclaration varDeclaration : methodDeclaration.getArgs())
+            currentSlot.add(varDeclaration.getVarName().getName());
+        for (VarDeclaration varDeclaration : methodDeclaration.getLocalVars())
+            varDeclaration.accept(this);
         for (Statement statement : methodDeclaration.getBody())
             statement.accept(this);
-        //todo visit local vars and body and add return if needed
-        addCommand("return"); // TODO: Check return type
+
+        if (!methodDeclaration.getDoesReturn())
+            addCommand("return");
         addCommand(".end method");
+        addCommand("");
         return null;
     }
 
@@ -284,79 +321,63 @@ public class CodeGenerator extends Visitor<String> {
         //todo
         String command = "";
         command += ".field ";
-        command += fieldDeclaration.getVarDeclaration().getVarName().getName();
-        if (expressionTypeChecker.isSameType(fieldDeclaration.getVarDeclaration().getType(), new IntType()))
-            command += " I";
-        else if (expressionTypeChecker.isSameType(fieldDeclaration.getVarDeclaration().getType(), new BoolType()))
-            command += " B";
-        else if (expressionTypeChecker.isSameType(fieldDeclaration.getVarDeclaration().getType(), new StringType()))
-            command += " Ljava/lang/String";
-        else if (expressionTypeChecker.isSameType(fieldDeclaration.getVarDeclaration().getType(), new ListType())) {
-            command += " [";
-//            list element visitor call
-        }
+        command += fieldDeclaration.getVarDeclaration().getVarName().getName() + ' ';
+        command += makeTypeSignature(fieldDeclaration.getVarDeclaration().getType());
         addCommand(command);
         return null;
     }
 
     @Override
     public String visit(VarDeclaration varDeclaration) {
-        //todo
-        Type varType = varDeclaration.getType();
-        if (varType instanceof IntType) {
-            addCommand("new java/lang/Integer");
-            addCommand("iconst_0");
-        } else if (varType instanceof BoolType) {
-            addCommand("new java/lang/Boolean");
-            addCommand("iconst_0");
-        } else if (varType instanceof StringType) {
-            addCommand("new java/lang/String");
-            addCommand("ldc \"\"");
-        } else if (varType instanceof ListType) {
-            ArrayList<ListNameType> listNameTypes = ((ListType) varType).getElementsTypes();
-            addCommand("new List");
-        }
+        int slot = currentSlot.size();
+        currentSlot.add(varDeclaration.getVarName().getName());
+        initializeType(varDeclaration.getType());
+        addCommand("astore" + betweenSlot(slot) + slot);
         return null;
     }
 
     @Override
     public String visit(AssignmentStmt assignmentStmt) {
         //todo
-        int slot = this.slotOf(assignmentStmt.getlValue().toString());
-        Value lValue = (Value)assignmentStmt.getlValue();
-        if (lValue instanceof IntValue)
-        {
-            String command = "";
-            command += "iload";
-            command += slot < 4 ? "_" + Integer.toString(slot) : " " + Integer.toString(slot);
-            command += "\n";
-            Expression rValue = assignmentStmt.getrValue();
-            command += "iconst";
-            int rv = Integer.parseInt(assignmentStmt.getrValue().toString());
-            command += rv < 4 ? "_" + Integer.toString(rv) : " " + Integer.toString(rv);
-            command += "\n";
-            command += "istore";
-            command += slot < 4 ? "_" + Integer.toString(slot) : " " + Integer.toString(slot);
-            addCommand(command);
-        }
-        else if (lValue instanceof BoolValue)
-        {
-//            here Under Construction
-        }
-        else if (lValue instanceof StringValue)
-        {
-
-        }
-        else if (lValue instanceof ListValue)
-        {
-
-        }
-        Expression lValue = assignmentStmt.getlValue();
-        Expression rValue = assignmentStmt.getrValue();
-        rValue.accept(this);
-        lValue.accept(this);
+        BinaryExpression binaryExpression = new BinaryExpression(assignmentStmt.getlValue(), assignmentStmt.getrValue(), BinaryOperator.assign);
+        addCommand(binaryExpression.accept(this));
         addCommand("pop");
         return null;
+//        int slot = this.slotOf(assignmentStmt.getlValue().toString());
+//        Value lValue = (Value)assignmentStmt.getlValue();
+//        if (lValue instanceof IntValue)
+//        {
+//            String command = "";
+//            command += "iload";
+//            command += slot < 4 ? "_" + Integer.toString(slot) : " " + Integer.toString(slot);
+//            command += "\n";
+//            Expression rValue = assignmentStmt.getrValue();
+//            command += "iconst";
+//            int rv = Integer.parseInt(assignmentStmt.getrValue().toString());
+//            command += rv < 4 ? "_" + Integer.toString(rv) : " " + Integer.toString(rv);
+//            command += "\n";
+//            command += "istore";
+//            command += slot < 4 ? "_" + Integer.toString(slot) : " " + Integer.toString(slot);
+//            addCommand(command);
+//        }
+//        else if (lValue instanceof BoolValue)
+//        {
+////            here Under Construction
+//        }
+//        else if (lValue instanceof StringValue)
+//        {
+//
+//        }
+//        else if (lValue instanceof ListValue)
+//        {
+//
+//        }
+//        Expression lValue = assignmentStmt.getlValue();
+//        Expression rValue = assignmentStmt.getrValue();
+//        rValue.accept(this);
+//        lValue.accept(this);
+//        addCommand("pop");
+//        return null;
     }
 
     @Override
