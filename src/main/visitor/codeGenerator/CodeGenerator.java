@@ -346,41 +346,6 @@ public class CodeGenerator extends Visitor<String> {
         addCommand(binaryExpression.accept(this));
         addCommand("pop");
         return null;
-//        int slot = this.slotOf(assignmentStmt.getlValue().toString());
-//        Value lValue = (Value)assignmentStmt.getlValue();
-//        if (lValue instanceof IntValue)
-//        {
-//            String command = "";
-//            command += "iload";
-//            command += slot < 4 ? "_" + Integer.toString(slot) : " " + Integer.toString(slot);
-//            command += "\n";
-//            Expression rValue = assignmentStmt.getrValue();
-//            command += "iconst";
-//            int rv = Integer.parseInt(assignmentStmt.getrValue().toString());
-//            command += rv < 4 ? "_" + Integer.toString(rv) : " " + Integer.toString(rv);
-//            command += "\n";
-//            command += "istore";
-//            command += slot < 4 ? "_" + Integer.toString(slot) : " " + Integer.toString(slot);
-//            addCommand(command);
-//        }
-//        else if (lValue instanceof BoolValue)
-//        {
-////            here Under Construction
-//        }
-//        else if (lValue instanceof StringValue)
-//        {
-//
-//        }
-//        else if (lValue instanceof ListValue)
-//        {
-//
-//        }
-//        Expression lValue = assignmentStmt.getlValue();
-//        Expression rValue = assignmentStmt.getrValue();
-//        rValue.accept(this);
-//        lValue.accept(this);
-//        addCommand("pop");
-//        return null;
     }
 
     @Override
@@ -410,7 +375,11 @@ public class CodeGenerator extends Visitor<String> {
                 branch(binaryExpression.getFirstOperand(), trueString, "Label" + Integer.toString(labelCounter - 1));
                 addCommand("Label" + Integer.toString(labelCounter - 1) + ":");
                 branch(binaryExpression.getSecondOperand(), trueString, falseString);
-            } // Todo: Does it have else?
+            } else {
+                addCommand(((BinaryExpression) condition).accept(this));
+                addCommand("ifeq " + falseString);
+                addCommand("goto " + trueString);
+            }
         } else if (condition instanceof UnaryExpression) {
             if (((UnaryExpression) condition).getOperator() == UnaryOperator.not)
                 branch(((UnaryExpression) condition).getOperand(), falseString, trueString);
@@ -439,7 +408,8 @@ public class CodeGenerator extends Visitor<String> {
         expressionTypeChecker.setIsInMethodCallStmt(true);
         addCommand(methodCallStmt.getMethodCall().accept(this));
         expressionTypeChecker.setIsInMethodCallStmt(false);
-        addCommand("pop");
+        if (!(((FptrType) methodCallStmt.getMethodCall().getInstance().accept(expressionTypeChecker)).getReturnType() instanceof NullType))
+            addCommand("pop");
         return null;
     }
 
