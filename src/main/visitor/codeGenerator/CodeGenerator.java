@@ -162,10 +162,7 @@ public class CodeGenerator extends Visitor<String> {
             addCommand("iconst_0");
             addCommand("invokespecial java/lang/Boolean/<init>(Z)V");
         } else if (type instanceof StringType) {
-            addCommand("new java/lang/String");
-            addCommand("dup");
             addCommand("ldc \"\"");
-            addCommand("invokespecial java/lang/String/<init>(Ljava/lang/String;)V");
         } else if (type instanceof ListType) {
             addCommand("new List");
             addCommand("dup ");
@@ -177,7 +174,8 @@ public class CodeGenerator extends Visitor<String> {
             for (ListNameType listNameType : listNameTypes) {
                 addCommand("dup");
                 initializeType(listNameType.getType());
-                addCommand("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)V");
+                addCommand("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z");
+                addCommand("pop");
             }
             addCommand("invokespecial List/<init>(Ljava/util/ArrayList;)V");
         } else if (type instanceof FptrType) {
@@ -394,9 +392,45 @@ public class CodeGenerator extends Visitor<String> {
         return null;
     }
 
+    void branch(Expression condition, String trueString, String falseString) {
+        if (condition instanceof BoolValue) {
+            if (((BoolValue) condition).getConstant())
+                addCommand("goto " + trueString);
+            else
+                addCommand("goto " + falseString);
+        } else if (condition instanceof BinaryExpression) {
+            BinaryExpression binaryExpression = (BinaryExpression) condition;
+            if (binaryExpression.getBinaryOperator() == BinaryOperator.and) {
+                labelCounter += 1;
+                branch(binaryExpression.getFirstOperand(), "Label" + Integer.toString(labelCounter - 1), falseString);
+                addCommand("Label" + Integer.toString(labelCounter - 1) + ":");
+                branch(binaryExpression.getSecondOperand(), trueString, falseString);
+            } else if (binaryExpression.getBinaryOperator() == BinaryOperator.or) {
+                labelCounter += 1;
+                branch(binaryExpression.getFirstOperand(), trueString, "Label" + Integer.toString(labelCounter - 1));
+                addCommand("Label" + Integer.toString(labelCounter - 1) + ":");
+                branch(binaryExpression.getSecondOperand(), trueString, falseString);
+            } // Todo: Does it have else?
+        } else if (condition instanceof UnaryExpression) {
+            if (((UnaryExpression) condition).getOperator() == UnaryOperator.not)
+                branch(((UnaryExpression) condition).getOperand(), falseString, trueString);
+            else {
+                ((UnaryExpression) condition).getOperand().accept(this);
+                addCommand("ifeq " + falseString);
+                addCommand("goto " + trueString);
+            }
+        }
+    }
+
     @Override
     public String visit(ConditionalStmt conditionalStmt) {
-        // TODO
+        labelCounter += 2;
+        branch(conditionalStmt.getCondition(), "Label" + Integer.toString(labelCounter - 2), "Label" + Integer.toString(labelCounter - 1));
+        addCommand("Label" + Integer.toString(labelCounter - 2) + ":");
+        conditionalStmt.getThenBody().accept(this);
+        addCommand("Label" + Integer.toString(labelCounter - 1) + ":");
+        if (conditionalStmt.getElseBody() != null)
+            conditionalStmt.getElseBody().accept(this);
         return null;
     }
 
@@ -466,29 +500,31 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ForStmt forStmt) {
+        this.labelCounter += 4;
+
         if (forStmt.getInitialize() != null)
             addCommand(forStmt.getInitialize().accept(this));
 
-        addCommand("Label" + Integer.toString(this.labelCounter + 3) + ":");
+        addCommand("Label" + Integer.toString(this.labelCounter - 3) + ":");
         if (forStmt.getCondition() != null)
-            branch(forStmt.getCondition(), "Label" + Integer.toString(this.labelCounter), "Label" + Integer.toString(this.labelCounter + 1));
+            branch(forStmt.getCondition(), "Label" + Integer.toString(this.labelCounter), "Label" + Integer.toString(this.labelCounter - 1));
 
         addCommand("Label" + Integer.toString(this.labelCounter) + ":");
-        if (forStmt.getBody() != null){
-            continueLabels.add("Label" + Integer.toString(this.labelCounter + 2));
-            breakLabels.add("Label" + Integer.toString(this.labelCounter + 1));
+        if (forStmt.getBody() != null) {
+            continueLabels.add("Label" + Integer.toString(this.labelCounter - 2));
+            breakLabels.add("Label" + Integer.toString(this.labelCounter - 1));
             forStmt.getBody().accept(this);
             continueLabels.remove(continueLabels.size() - 1);
             breakLabels.remove(breakLabels.size() - 1);
         }
 
-        addCommand("Label" + Integer.toString(this.labelCounter + 2) + ":");
+        addCommand("Label" + Integer.toString(this.labelCounter - 2) + ":");
         if (forStmt.getUpdate() != null)
             forStmt.getUpdate().accept(this);
-        addCommand("goto Label" + Integer.toString(this.labelCounter + 3) + ":");
+        addCommand("goto Label" + Integer.toString(this.labelCounter - 3) + ":");
 
-        addCommand("Label" + Integer.toString(this.labelCounter + 1) + ":");
-        this.labelCounter += 4;
+        addCommand("Label" + Integer.toString(this.labelCounter - 1) + ":");
+
         return null;
     }
 
@@ -648,7 +684,12 @@ public class CodeGenerator extends Visitor<String> {
         commands += listAccessByIndex.getIndex().accept(this);
         commands += "invokevirtual List/getElement(I)Ljava/lang/Object;\n";
 
-        Type elementType = ((ListType) listAccessByIndex.getInstance().accept(expressionTypeChecker)).getElementsTypes().get(((IntValue) listAccessByIndex.getIndex()).getConstant()).getType();
+        Type elementType;
+
+        if(listAccessByIndex.getIndex() instanceof IntValue)
+            elementType = ((ListType) listAccessByIndex.getInstance().accept(expressionTypeChecker)).getElementsTypes().get(((IntValue) listAccessByIndex.getIndex()).getConstant()).getType();
+        else
+            elementType = ((ListType) listAccessByIndex.getInstance().accept(expressionTypeChecker)).getElementsTypes().get(0).getType();
 
         if (elementType instanceof IntType) {
             commands += "checkcast java/lang/Integer\n";
